@@ -1,16 +1,18 @@
 package rssreader
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import rssreader.model.Channel
 import rssreader.model.Post
+import rssreader.model.noticeNewPost
 import java.time.Duration
 
 fun main(): Unit =
-    runBlocking {
+    runBlocking(SupervisorJob()) {
         val channels =
             listOf(
                 Channel("https://aws.amazon.com/ko/blogs/aws/feed/"),
@@ -22,12 +24,15 @@ fun main(): Unit =
 
         launch(Dispatchers.IO) {
             while (isActive) {
-                println("검색어를 입력하세요 (없으면 전체 출력):")
-                val keyword = readln()
-                posts
-                    .filter { it.title.contains(keyword) }
-                    .take(10)
-                    .forEachIndexed { index, post -> println("[${index + 1}] ${post.title} (${post.pubData}) - ${post.link}") }
+                if (posts.isNotEmpty()) {
+                    println("검색어를 입력하세요 (없으면 전체 출력):")
+                    val keyword = readln()
+                    posts
+                        .filter { it.title.contains(keyword) }
+                        .take(10)
+                        .forEachIndexed { index, post -> println("[${index + 1}] ${post.title} (${post.pubData}) - ${post.link}") }
+                        .apply { println() }
+                }
             }
         }
 
@@ -37,8 +42,10 @@ fun main(): Unit =
                     channels
                         .flatMap { it.findPosts() }
                         .toMutableList()
-                        .apply { this.sortByDescending { it.pubData } }
-                        .toMutableList()
+                        .apply {
+                            sortByDescending { it.pubData }
+                            noticeNewPost(posts)
+                        }.toMutableList()
                 delay(Duration.ofMinutes(10).toMillis())
             }
         }
