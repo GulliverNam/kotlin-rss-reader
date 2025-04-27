@@ -1,10 +1,15 @@
 package rssreader
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import rssreader.model.Channel
+import rssreader.model.Post
+import java.time.Duration
 
-fun main() =
+fun main(): Unit =
     runBlocking {
         val channels =
             listOf(
@@ -13,16 +18,28 @@ fun main() =
                 Channel("https://techblog.woowahan.com/feed"),
             )
 
-        while (isActive) { // while(true) -> 외부에서 job 을 cancel 시켜도 종료되지 않음
-            println("검색어를 입력하세요 (없으면 전체 출력):")
-            val keyword = readln()
+        var posts = listOf<Post>()
 
-            channels
-                .flatMap { it.findPosts() }
-                .toMutableList()
-                .apply { this.sortByDescending { it.pubData } }
-                .filter { it.title.contains(keyword) }
-                .take(10)
-                .forEachIndexed { index, post -> println("[${index + 1}] ${post.title} (${post.pubData}) - ${post.link}") }
+        launch(Dispatchers.IO) {
+            while (isActive) {
+                println("검색어를 입력하세요 (없으면 전체 출력):")
+                val keyword = readln()
+                posts
+                    .filter { it.title.contains(keyword) }
+                    .take(10)
+                    .forEachIndexed { index, post -> println("[${index + 1}] ${post.title} (${post.pubData}) - ${post.link}") }
+            }
+        }
+
+        launch {
+            while (isActive) { // while(true) -> 외부에서 job 을 cancel 시켜도 종료되지 않음
+                posts =
+                    channels
+                        .flatMap { it.findPosts() }
+                        .toMutableList()
+                        .apply { this.sortByDescending { it.pubData } }
+                        .toMutableList()
+                delay(Duration.ofMinutes(10).toMillis())
+            }
         }
     }
